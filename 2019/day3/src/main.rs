@@ -1,5 +1,6 @@
 // What is the Manhattan distance from the central port to the closest intersection?
 use std::collections::HashSet;
+use std::io;
 
 // 2d Coordinate struct to use as key in HashMap
 #[derive(PartialEq, Eq, Hash, Debug, Copy, Clone)]
