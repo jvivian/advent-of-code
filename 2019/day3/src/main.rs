@@ -1,5 +1,16 @@
-// What is the Manhattan distance from the central port to the closest intersection?
-use std::collections::HashSet;
+// The wires twist and turn, but the two wires occasionally cross paths. To fix the circuit,
+// you need to find the intersection point closest to the central port. Because the wires
+// are on a grid, use the Manhattan distance for this measurement. While the wires do technically
+// cross right at the central port where they both start, this point does not count, nor does a
+// wire count as crossing with itself.
+// For example, if the first wire's path is R8,U5,L5,D3, then starting from the central port (o),
+// it goes right 8, up 5, left 5, and finally down 3.
+
+// P1: What is the Manhattan distance from the central port to the closest intersection?
+
+// P2: To do this, calculate the number of steps each wire takes to reach each intersection;
+// choose the intersection where the sum of both wires' steps is lowest
+use std::collections::{HashMap, HashSet};
 use std::io;
 
 // 2d Coordinate struct to use as key in HashMap
@@ -9,14 +20,14 @@ struct Coord {
     y: i32,
 }
 
-// Manhattan distance is just the absolute value summed
+// Manhattan distance is the absolute value summed
 impl Coord {
     fn manhattan_distance(self) -> i32 {
         self.x.abs() + self.y.abs()
     }
 }
 
-// Enum for direction (up, down, left, right)
+// Enum for direction (up, down, left, right) and distance
 #[derive(Debug)]
 enum Direction {
     Up(i32),
@@ -61,61 +72,82 @@ fn main() {
     let wire2: Vec<&str> = wire2.trim().split(',').collect();
 
     // Get set of all wire coordinates in path
-    let set1 = parse_wire(wire1);
-    let set2 = parse_wire(wire2);
+    let map1 = parse_wire(wire1);
+    let map2 = parse_wire(wire2);
 
-    // Get intersection coordinates between wire1 and wire2
-    let inter: HashSet<_> = set1.intersection(&set2).collect();
+    // Get intersection
+    let set1: HashSet<Coord> = map1.keys().cloned().collect();
+    let set2: HashSet<Coord> = map2.keys().cloned().collect();
 
-    // Finally, calculate the minimum manhattan distance
+    // Get minimum distance and steps
     let min_dist = set1
         .intersection(&set2)
         .map(|x| x.manhattan_distance())
         .min()
         .unwrap();
 
+    // Get minimum number of steps
+    let min_steps = set1
+        .intersection(&set2)
+        .map(|x| map1[x] + map2[x])
+        .min()
+        .unwrap();
+
     println!(
-        "The Manhattan dist of the closest intersection is: {:?}",
-        min_dist
+        "Minimum Manhattan dist: {}\tMinimum steps: {}",
+        min_dist, min_steps
     );
 }
 
 // Parse each wire by adding its Coords to a HashSet
 // Range iteration works ONE WAY (smaller to larger)
-// Ergo, Down and Left ranges are reversed (although .rev() is unnecessary here)
-fn parse_wire(wire: Vec<&str>) -> HashSet<Coord> {
-    let mut set = HashSet::new();
+fn parse_wire(wire: Vec<&str>) -> HashMap<Coord, u32> {
+    // HashMap to store steps, Coord to represent current position, and step counter
+    let mut map = HashMap::new();
     let mut current = Coord { x: 0, y: 0 };
+    let mut steps: u32 = 0;
+
+    // Parse input and update wire position
     for entry in wire {
-        // Update HashSet with coordinates
         match entry.into() {
             Direction::Up(val) => {
-                for y in current.y..current.y + val + 1 {
-                    set.insert(Coord { x: current.x, y });
+                for y in current.y + 1..current.y + val + 1 {
+                    let c = Coord { x: current.x, y };
+                    wire_step(c, &mut steps, &mut map);
                 }
                 current.y = current.y + val;
             }
             Direction::Down(val) => {
                 for y in current.y - val..current.y {
-                    set.insert(Coord { x: current.x, y });
+                    let c = Coord { x: current.x, y };
+                    wire_step(c, &mut steps, &mut map);
                 }
                 current.y = current.y - val;
             }
             Direction::Right(val) => {
-                for x in current.x..current.x + val + 1 {
-                    set.insert(Coord { x, y: current.y });
+                for x in current.x + 1..current.x + val + 1 {
+                    let c = Coord { x, y: current.y };
+                    wire_step(c, &mut steps, &mut map);
                 }
                 current.x = current.x + val;
             }
             Direction::Left(val) => {
                 for x in current.x - val..current.x {
-                    set.insert(Coord { x, y: current.y });
+                    let c = Coord { x, y: current.y };
+                    wire_step(c, &mut steps, &mut map);
                 }
                 current.x = current.x - val;
             }
         };
     }
-    // Central port is ignored, so remove 0,0
-    set.remove(&Coord { x: 0, y: 0 });
-    set
+    map.remove(&Coord { x: 0, y: 0 });
+    map
+}
+
+// Update a HashMap counter of the wire
+fn wire_step(c: Coord, steps: &mut u32, map: &mut HashMap<Coord, u32>) -> () {
+    *steps += 1;
+    if !map.contains_key(&c) {
+        map.insert(c, *steps);
+    }
 }
