@@ -1,29 +1,11 @@
-// First, you'll need to add two new instructions:
-//
-// Opcode 3 takes a single integer as input and saves it to the position given by its only parameter.
-// For example, the instruction 3,50 would take an input value and store it at address 50.
-// Opcode 4 outputs the value of its only parameter. For example, the instruction 4,50 would output
-// the value at address 50.
-
-// Second, you'll need to add support for parameter modes:
-//
-// Each parameter of an instruction is handled based on its parameter mode. Right now, your ship
-// computer already understands parameter mode 0, position mode, which causes the parameter to be
-// interpreted as a position - if the parameter is 50, its value is the value stored at address 50
-// in memory. Until now, all parameters have been in position mode.
-//
-// Now, your ship computer will also need to handle parameters in mode 1, immediate mode. In
-// immediate mode, a parameter is interpreted as a value - if the parameter is 50, its value
-// is simply 50.
-
-// P1: Provide input 1 to the computer when asked and provide final output value
+// See README for instructions
 
 use std::fs::File;
 use std::io::stdin;
 use std::io::{BufRead, BufReader};
 use std::mem::replace;
 
-// Struct for each Instruction
+// Struct to hold each Instruction
 #[derive(Debug)]
 struct Instruction {
     opcode: Opcode,
@@ -32,7 +14,6 @@ struct Instruction {
     m3: Mode,
 }
 
-// convert str to Instruction
 impl From<i32> for Instruction {
     fn from(item: i32) -> Instruction {
         let item = pad_instruction(&item);
@@ -46,7 +27,7 @@ impl From<i32> for Instruction {
     }
 }
 
-//
+// Defines the operation code / task to perform
 #[derive(Debug)]
 enum Opcode {
     Add,
@@ -56,7 +37,6 @@ enum Opcode {
     Halt,
 }
 
-// convert str to Opcode
 impl From<&str> for Opcode {
     fn from(item: &str) -> Opcode {
         use Opcode::*;
@@ -73,14 +53,12 @@ impl From<&str> for Opcode {
     }
 }
 
-// Modes can either be Parameter or Immediate
 #[derive(Debug)]
 enum Mode {
     Parameter,
     Immediate,
 }
 
-// Convert str to Mode
 impl From<&str> for Mode {
     fn from(item: &str) -> Mode {
         let item = item.parse::<i32>().expect("Failed to parse integer");
