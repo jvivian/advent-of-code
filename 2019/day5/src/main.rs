@@ -34,6 +34,10 @@ enum Opcode {
     Multiply,
     Input,
     Output,
+    JumpTrue,
+    JumpFalse,
+    LessThan,
+    Equals,
     Halt,
 }
 
@@ -47,6 +51,10 @@ impl From<&str> for Opcode {
             2 => Multiply,
             3 => Input,
             4 => Output,
+            5 => JumpTrue,
+            6 => JumpFalse,
+            7 => LessThan,
+            8 => Equals,
             99 => Halt,
             _ => unreachable!(),
         }
@@ -104,9 +112,6 @@ fn fetch(arr: &mut Vec<i32>, mode: &Mode, i: usize) -> i32 {
 fn main() {
     let mut arr = parse_input("src/input.txt");
 
-    let a: Instruction = 1.into();
-    println!("Input: {:?} ", a);
-
     let mut i = 0;
     loop {
         let ins: Instruction = arr[i].into();
@@ -114,15 +119,15 @@ fn main() {
             Opcode::Add => {
                 let v1 = fetch(&mut arr, &ins.m1, &i + 1);
                 let v2 = fetch(&mut arr, &ins.m2, &i + 2);
-                let store = arr[&i + 3];
-                replace(&mut arr[store as usize], v1 + v2);
+                let store = arr[&i + 3] as usize;
+                replace(&mut arr[store], v1 + v2);
                 i += 4;
             }
             Opcode::Multiply => {
                 let v1 = fetch(&mut arr, &ins.m1, &i + 1);
                 let v2 = fetch(&mut arr, &ins.m2, &i + 2);
-                let store = arr[&i + 3];
-                replace(&mut arr[store as usize], v1 * v2);
+                let store = arr[&i + 3] as usize;
+                replace(&mut arr[store], v1 * v2);
                 i += 4;
             }
             Opcode::Input => {
@@ -133,14 +138,50 @@ fn main() {
                     .trim()
                     .parse()
                     .expect("Failed to parse input as integer");
-                let store = arr[i + 1];
-                replace(&mut arr[store as usize], input);
+                let store = arr[i + 1] as usize;
+                replace(&mut arr[store], input);
                 i += 2;
             }
             Opcode::Output => {
-                let address = arr[i + 1];
-                println!("Output: {}", arr[address as usize]);
+                let val = fetch(&mut arr, &ins.m1, &i + 1);
+                println!("Output: {}", val);
                 i += 2;
+            }
+            Opcode::JumpTrue => {
+                let v1 = fetch(&mut arr, &ins.m1, &i + 1);
+                let v2 = fetch(&mut arr, &ins.m2, &i + 2);
+                match v1 {
+                    0 => i += 3,
+                    _ => i = v2 as usize,
+                }
+            }
+            Opcode::JumpFalse => {
+                let v1 = fetch(&mut arr, &ins.m1, &i + 1);
+                let v2 = fetch(&mut arr, &ins.m2, &i + 2);
+                match v1 {
+                    0 => i = v2 as usize,
+                    _ => i += 3,
+                }
+            }
+            Opcode::LessThan => {
+                let v1 = fetch(&mut arr, &ins.m1, &i + 1);
+                let v2 = fetch(&mut arr, &ins.m2, &i + 2);
+                let store = arr[&i + 3] as usize;
+                match v1 < v2 {
+                    true => replace(&mut arr[store], 1),
+                    false => replace(&mut arr[store], 0),
+                };
+                i += 4;
+            }
+            Opcode::Equals => {
+                let v1 = fetch(&mut arr, &ins.m1, &i + 1);
+                let v2 = fetch(&mut arr, &ins.m2, &i + 2);
+                let store = arr[&i + 3] as usize;
+                match v1 == v2 {
+                    true => replace(&mut arr[store], 1),
+                    false => replace(&mut arr[store], 0),
+                };
+                i += 4;
             }
             Opcode::Halt => {
                 println!("Halting program");
