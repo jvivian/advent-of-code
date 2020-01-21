@@ -4,7 +4,7 @@ use itertools::Itertools;
 fn main() {
     let arr = parse_input("data/input.txt");
     let mut largest = 0;
-    for phase in (0..9).permutations(5) {
+    for phase in (0..10).permutations(5) {
         let mut new_arr = arr.clone();
         let mut input = 0;
         for p in &phase {
