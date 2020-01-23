@@ -26,6 +26,14 @@ impl From<i32> for Instruction {
     }
 }
 
+// Amplifier representation. `arr` is the instruction state,
+// `i` is the instruction pointer, and `input` contains inputs to `pop` as used
+struct Amplifier {
+    arr: Vec<i32>,
+    i: i32,
+    input: Vec<i32>
+}
+
 // Defines the operation code / task to perform
 #[derive(Debug)]
 enum Opcode {
@@ -135,7 +143,7 @@ pub fn run(input: &mut Vec<i32>, arr: &mut Vec<i32>) -> Option<i32> {
             }
             Opcode::Output => {
                 let val = fetch(&arr, &ins.m1, &i + 1);
-                return Some(val);
+                return Some(val)
             }
             Opcode::JumpTrue => {
                 let v1 = fetch(&arr, &ins.m1, &i + 1);
@@ -176,6 +184,7 @@ pub fn run(input: &mut Vec<i32>, arr: &mut Vec<i32>) -> Option<i32> {
             Opcode::Halt => {
                 println!("Halting program");
                 break;
+
             }
         }
     }

@@ -31,8 +31,29 @@ mod tests {
         for p in phase.iter() {
             let mut vec = vec![input, p.clone()];
             input = run(&mut vec, &mut arr).expect("Failed to collect output");
-            println!("Input: {}", &input);
         }
         assert_eq!(input, 43210);
+    }
+
+    #[test]
+    fn test_feedback_loop() {
+        let arr = parse_input("data/input-test-p2.txt");
+        let mut new_arr = arr.clone();
+        let phase = [9,8,7,6,5];
+        let mut input = 0;
+        let mut i = 0;
+        loop {
+//            let mut new_arr = arr.clone();
+            println!("Iteration: {}\tInput: {}\tPhase: {}", &i, &input, &phase[i % 5]);
+            let mut vec = vec![input, phase[i % 5]];
+            match run(&mut vec, &mut new_arr) {
+                Some(output) => input = output,
+                None => break
+            }
+            i += 1;
+            if input > 139629729 { break }
+        }
+        println!("Final Output {}", input);
+        assert_eq!(139629729, input)
     }
 }
