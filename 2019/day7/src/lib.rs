@@ -156,7 +156,7 @@ pub fn run(amp: &mut Amplifier) -> Option<i32> {
             }
             // First check for phase to use as input
             // Then, check for input value
-            // Finally, if no input available, return None
+            // If input is requested and there isn't any, something went wrong
             Opcode::Input => {
                 let store = amp.arr[&amp.i + 1] as usize;
                 if let Some(phase) = amp.phase {
