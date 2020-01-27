@@ -4,7 +4,7 @@ use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::mem::replace;
 
-// Struct to hold each Instruction
+// Holds one instruction
 #[derive(Debug)]
 struct Instruction {
     opcode: Opcode,
@@ -27,14 +27,17 @@ impl From<i32> for Instruction {
 }
 
 // Amplifier representation. `arr` is the instruction state,
-// `i` is the instruction pointer, and `input` contains inputs to `pop` as used
-struct Amplifier {
-    arr: Vec<i32>,
-    i: i32,
-    input: Vec<i32>
+// `i` is the instruction pointer, `phase` holds the initial input phase
+// and `input` contains the primary input to use after the phase signal is applied
+#[derive(Debug)]
+pub struct Amplifier {
+    pub arr: Vec<i32>,
+    pub i: usize,
+    pub phase: Option<i32>,
+    pub input: Option<i32>,
 }
 
-// Defines the operation code / task to perform
+// Enum to hold the operation code to be performed
 #[derive(Debug)]
 enum Opcode {
     Add,
@@ -68,6 +71,7 @@ impl From<&str> for Opcode {
     }
 }
 
+// Enum for monitoring which MODE a given parameter is in
 #[derive(Debug)]
 enum Mode {
     Parameter,
@@ -116,75 +120,102 @@ pub fn parse_input(path: &str) -> Vec<i32> {
         .collect()
 }
 
-pub fn run(input: &mut Vec<i32>, arr: &mut Vec<i32>) -> Option<i32> {
-    let mut i = 0;
+// Creates a vector of Amplifiers given a vector of phases and an instruction path
+pub fn initalize_amplifiers(phases: Vec<i32>, arr_path: &str) -> Vec<Amplifier> {
+    let arr = parse_input(arr_path);
+    let mut amps = vec![];
+    for p in phases {
+        amps.push(Amplifier {
+            arr: arr.clone(),
+            i: 0,
+            phase: Some(p),
+            input: None,
+        });
+    }
+    amps
+}
+
+// Runs an Amplifier
+pub fn run(amp: &mut Amplifier) -> Option<i32> {
     loop {
-        let ins: Instruction = arr[i].into();
+        let ins: Instruction = amp.arr[amp.i].into();
         match ins.opcode {
             Opcode::Add => {
-                let v1 = fetch(&arr, &ins.m1, &i + 1);
-                let v2 = fetch(&arr, &ins.m2, &i + 2);
-                let store = arr[&i + 3] as usize;
-                replace(&mut arr[store], v1 + v2);
-                i += 4;
+                let v1 = fetch(&amp.arr, &ins.m1, &amp.i + 1);
+                let v2 = fetch(&amp.arr, &ins.m2, &amp.i + 2);
+                let store = amp.arr[&amp.i + 3] as usize;
+                replace(&mut amp.arr[store], v1 + v2);
+                amp.i += 4;
             }
             Opcode::Multiply => {
-                let v1 = fetch(&arr, &ins.m1, &i + 1);
-                let v2 = fetch(&arr, &ins.m2, &i + 2);
-                let store = arr[&i + 3] as usize;
-                replace(&mut arr[store], v1 * v2);
-                i += 4;
+                let v1 = fetch(&amp.arr, &ins.m1, &amp.i + 1);
+                let v2 = fetch(&amp.arr, &ins.m2, &amp.i + 2);
+                let store = amp.arr[&amp.i + 3] as usize;
+                replace(&mut amp.arr[store], v1 * v2);
+                amp.i += 4;
             }
+            // First check for phase to use as input
+            // Then, check for input value
+            // Finally, if no input available, return None
             Opcode::Input => {
-                let value = input.pop().expect("Failed to pop input, likely empty");
-                let store = arr[i + 1] as usize;
-                replace(&mut arr[store], value);
-                i += 2;
+                let store = amp.arr[&amp.i + 1] as usize;
+                if let Some(phase) = amp.phase {
+                    replace(&mut amp.arr[store], phase);
+                    amp.phase = None
+                } else if let Some(input) = amp.input {
+                    replace(&mut amp.arr[store], input);
+                    amp.input = None
+                } else {
+                    unreachable!(
+                        "Hey! You're not supposed to be here! Returned NONE from an input opcode"
+                    );
+                }
+                amp.i += 2;
             }
             Opcode::Output => {
-                let val = fetch(&arr, &ins.m1, &i + 1);
-                return Some(val)
+                let val = fetch(&amp.arr, &ins.m1, &amp.i + 1);
+                amp.i += 2;
+                return Some(val);
             }
             Opcode::JumpTrue => {
-                let v1 = fetch(&arr, &ins.m1, &i + 1);
-                let v2 = fetch(&arr, &ins.m2, &i + 2);
+                let v1 = fetch(&amp.arr, &ins.m1, &amp.i + 1);
+                let v2 = fetch(&amp.arr, &ins.m2, &amp.i + 2);
                 match v1 {
-                    0 => i += 3,
-                    _ => i = v2 as usize,
+                    0 => amp.i += 3,
+                    _ => amp.i = v2 as usize,
                 }
             }
             Opcode::JumpFalse => {
-                let v1 = fetch(&arr, &ins.m1, &i + 1);
-                let v2 = fetch(&arr, &ins.m2, &i + 2);
+                let v1 = fetch(&amp.arr, &ins.m1, &amp.i + 1);
+                let v2 = fetch(&amp.arr, &ins.m2, &amp.i + 2);
                 match v1 {
-                    0 => i = v2 as usize,
-                    _ => i += 3,
+                    0 => amp.i = v2 as usize,
+                    _ => amp.i += 3,
                 }
             }
             Opcode::LessThan => {
-                let v1 = fetch(&arr, &ins.m1, &i + 1);
-                let v2 = fetch(&arr, &ins.m2, &i + 2);
-                let store = arr[&i + 3] as usize;
+                let v1 = fetch(&amp.arr, &ins.m1, &amp.i + 1);
+                let v2 = fetch(&amp.arr, &ins.m2, &amp.i + 2);
+                let store = amp.arr[&amp.i + 3] as usize;
                 match v1 < v2 {
-                    true => replace(&mut arr[store], 1),
-                    false => replace(&mut arr[store], 0),
+                    true => replace(&mut amp.arr[store], 1),
+                    false => replace(&mut amp.arr[store], 0),
                 };
-                i += 4;
+                amp.i += 4;
             }
             Opcode::Equals => {
-                let v1 = fetch(&arr, &ins.m1, &i + 1);
-                let v2 = fetch(&arr, &ins.m2, &i + 2);
-                let store = arr[&i + 3] as usize;
+                let v1 = fetch(&amp.arr, &ins.m1, &amp.i + 1);
+                let v2 = fetch(&amp.arr, &ins.m2, &amp.i + 2);
+                let store = amp.arr[&amp.i + 3] as usize;
                 match v1 == v2 {
-                    true => replace(&mut arr[store], 1),
-                    false => replace(&mut arr[store], 0),
+                    true => replace(&mut amp.arr[store], 1),
+                    false => replace(&mut amp.arr[store], 0),
                 };
-                i += 4;
+                amp.i += 4;
             }
             Opcode::Halt => {
-                println!("Halting program");
+                println!("Halting Amplifier!");
                 break;
-
             }
         }
     }
