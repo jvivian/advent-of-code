@@ -4,6 +4,7 @@
 // you to find the layer that contains the fewest 0 digits. On that layer, what is the
 // number of 1 digits multiplied by the number of 2 digits?
 
+use colored::*;
 use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
@@ -37,7 +38,7 @@ fn convert_to_layers(pixels: Vec<i32>) -> Vec<HashMap<Coord, i32>> {
         y += 1;
         if y % 25 == 0 {
             x += 1;
-            y = 1;
+            y = 0;
         }
         if (i + 1) % 150 == 0 {
             layers.push(map.clone());
@@ -68,12 +69,36 @@ fn get_fewest_zeros(layers: &Vec<HashMap<Coord, i32>>) -> usize {
     index
 }
 
+// Counts occurrences of an integer within a layer
 fn count_n(layer: &HashMap<Coord, i32>, n: i32) -> usize {
     layer
         .values()
         .filter(|&x| *x == n)
         .collect::<Vec<_>>()
         .len()
+}
+
+// Return composite layer
+fn compile_layers(layers: &Vec<HashMap<Coord, i32>>) -> HashMap<Coord, i32> {
+    let mut composite = HashMap::new();
+    for x in 0..6 {
+        for y in 0..25 {
+            for layer in layers {
+                match layer.get(&Coord { x, y }) {
+                    Some(0) => {
+                        composite.insert(Coord { x, y }, 0);
+                        break;
+                    }
+                    Some(1) => {
+                        composite.insert(Coord { x, y }, 1);
+                        break;
+                    }
+                    _ => continue,
+                }
+            }
+        }
+    }
+    composite
 }
 
 fn main() {
@@ -86,6 +111,27 @@ fn main() {
         "Number of 1s multiplied by number of 2s in layer {} is {}",
         i, total
     );
+
+    // Part 2
+    let composite = compile_layers(&layers);
+    for x in 0..6 {
+        for y in 0..25 {
+            let c = &composite[&Coord { x, y }];
+            if y == 24 {
+                if *c == 0 {
+                    println!("{}", c.to_string().white());
+                } else {
+                    println!("{}", c.to_string().black());
+                }
+            } else {
+                if *c == 0 {
+                    print!("{}", c.to_string().white());
+                } else {
+                    print!("{}", c.to_string().black());
+                }
+            }
+        }
+    }
 }
 
 #[cfg(test)]
