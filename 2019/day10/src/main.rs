@@ -5,7 +5,7 @@
 
 use itertools::Itertools;
 use num::integer::gcd;
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 
@@ -47,8 +47,8 @@ fn distance(a1: &Asteroid, a2: &Asteroid) -> f32 {
 }
 
 // Compute a map of all deltas for a given asteroid
-fn delta_map(a1: &Asteroid, asteroids: &Vec<Asteroid>) -> HashMap<Delta, Vec<Asteroid>> {
-    let mut map = HashMap::new();
+fn delta_set(a1: &Asteroid, asteroids: &Vec<Asteroid>) -> HashSet<Delta> {
+    let mut set = HashSet::new();
     for a2 in asteroids {
         if a1 == a2 {
             continue;
@@ -58,19 +58,17 @@ fn delta_map(a1: &Asteroid, asteroids: &Vec<Asteroid>) -> HashMap<Delta, Vec<Ast
         let gcd_val = gcd(x, y);
         x = x / gcd_val;
         y = y / gcd_val;
-        let delta = Delta { x, y };
-        let vec = map.entry(delta).or_insert(vec![]);
-        vec.push(a2.clone());
+        set.insert(Delta { x, y });
     }
-    map
+    set
 }
 
 fn find_monitoring(asteroids: &Vec<Asteroid>) -> Asteroid {
     let mut station = Asteroid { x: -1, y: -1 };
     let mut most_los = 0;
     for a1 in asteroids {
-        let map = delta_map(a1, asteroids);
-        let current_count = map.len();
+        let set = delta_set(a1, asteroids);
+        let current_count = set.len();
         if current_count > most_los {
             most_los = current_count;
             station = a1.clone();
@@ -110,7 +108,7 @@ mod tests {
     fn test_delta_map() {
         let asteroids = parse_input("data/input-t2.txt");
         let a1 = Asteroid { x: 3, y: 4 };
-        let map = delta_map(&a1, &asteroids);
+        let map = delta_set(&a1, &asteroids);
         assert_eq!(map.len(), 8);
     }
 
