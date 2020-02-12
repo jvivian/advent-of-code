@@ -3,7 +3,6 @@
 // and proxy as "blocking" the view of one behind it.
 // The asteroid with the largest hashset is the winner
 
-use itertools::Itertools;
 use num::integer::gcd;
 use std::collections::HashSet;
 use std::fs::File;
@@ -25,8 +24,8 @@ struct Delta {
 // Converts input file to vector of asteroids
 fn parse_input(path: &str) -> Vec<Asteroid> {
     let f = File::open(path).expect("Failed to open file");
-    let mut f = BufReader::new(f);
-    let mut input = String::new();
+    let f = BufReader::new(f);
+    //let mut input = String::new();
     let mut vec = vec![];
     for (y, line) in f.lines().into_iter().enumerate() {
         for (x, element) in line.expect("Failed to parse line").chars().enumerate() {
@@ -39,11 +38,6 @@ fn parse_input(path: &str) -> Vec<Asteroid> {
         }
     }
     vec
-}
-
-// Distance between two asteroids
-fn distance(a1: &Asteroid, a2: &Asteroid) -> f32 {
-    (((a2.x - a1.x).pow(2) + (a2.y - a1.y).pow(2)) as f32).sqrt()
 }
 
 // Compute a map of all deltas for a given asteroid
