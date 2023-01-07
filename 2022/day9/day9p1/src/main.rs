@@ -1,4 +1,8 @@
+use std::collections::HashSet;
 use std::num::ParseIntError;
+use std::path::PathBuf;
+use std::str::FromStr;
+use thiserror::Error;
 /// Advent of Code
 /// Day 9 - Part 1
 /// Author: John Vivian
@@ -20,9 +24,6 @@ use std::num::ParseIntError;
 /// -- Adjacent => None
 /// -- AlignedGap => Move_Cardinal
 /// -- UnalignedGap => Move_Diagonal_Adjacent
-use std::path::PathBuf;
-use std::str::FromStr;
-use thiserror::Error;
 
 #[derive(Debug, PartialEq)]
 enum Move {
@@ -74,19 +75,21 @@ impl Coord {
 struct Rope {
     head: Coord,
     tail: Coord,
+    // Store Tail positions
+    tpos: HashSet<Coord>,
 }
 
 impl Rope {
-    // Move rope according to input
-    fn moves(m: Move) {}
+    // Move Rope according to input
+    fn move_head(self, m: Move) -> Self {}
 }
 
-enum TailAction {
-    Overlap,
-    Adjacent,
-    AlignedGap,
-    UnalignedGap,
-}
+// enum TailAction {
+//     Overlap,
+//     Adjacent,
+//     AlignedGap,
+//     UnalignedGap,
+// }
 
 fn main() {
     println!("Hello, world!");
