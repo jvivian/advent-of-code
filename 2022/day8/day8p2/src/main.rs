@@ -49,6 +49,7 @@ struct Forest {
     south: DataFrame,
     west: DataFrame,
     east: DataFrame,
+    visdf: Option<DataFrame>,
 }
 
 impl Forest {
@@ -58,19 +59,8 @@ impl Forest {
             south: df.clone().reverse(),
             west: df.clone().transpose().unwrap(),
             east: df.clone().transpose().unwrap().reverse(),
+            visdf: None,
         }
-    }
-
-    // Converts grid into boolean mask representing visibility
-    fn mask_trees(mut self) -> Self {
-        mask_visible(&mut self.north);
-        mask_visible(&mut self.south);
-        mask_visible(&mut self.west);
-        mask_visible(&mut self.east);
-        self.south = self.south.reverse();
-        self.west = self.west.transpose().unwrap();
-        self.east = self.east.reverse().transpose().unwrap();
-        self
     }
 
     // Converts grid into count of tree visibility
@@ -92,17 +82,31 @@ impl Forest {
     }
 
     // Converts boolean grid into [TREE x DIRECTION] matrix
-    fn visibility_matrix(self) -> Result<DataFrame, PolarsError> {
-        Ok(DataFrame::new(
-            vec![self.north, self.south, self.west, self.east]
+    fn visibility_matrix(mut self) -> Result<Self, PolarsError> {
+        self.visdf = Some(DataFrame::new(
+            vec![&self.north, &self.south, &self.west, &self.east]
                 .iter()
                 .zip(NAMES)
                 .map(|(d, name)| flatten(d, name))
                 .collect(),
-        )?)
+        )?);
+        Ok(self)
     }
-    fn highest_scenic_score(self) -> Self {
-        self
+
+    // Calcualte scenic scores
+    fn scenic_scores(self) -> Result<DataFrame, PolarsError> {
+        self.visdf
+            .expect("Missing visibility matrix")
+            .lazy()
+            .with_column(fold_exprs(lit(1), |acc, x| Ok(acc * x), [all()]).alias("Scenic Score"))
+            .sort(
+                "Scenic Score",
+                SortOptions {
+                    descending: false,
+                    nulls_last: false,
+                },
+            )
+            .collect()
     }
 }
 
@@ -137,28 +141,6 @@ fn num_visible(s: &Series) -> Series {
         .collect()
 }
 
-// Series map function to determine if a tree is visible
-fn is_visible(s: &Series) -> Series {
-    let mut big = -1;
-    s.iter()
-        .map(|v| {
-            let x = v.to_string().parse::<i32>().unwrap();
-            if x > big {
-                big = x;
-                return true;
-            }
-            false
-        })
-        .collect()
-}
-
-// Converts dataframe into boolean mask representing visibility
-fn mask_visible(df: &mut DataFrame) {
-    for name in &get_cols(&df) {
-        df.apply(name, is_visible).unwrap();
-    }
-}
-
 // Flatten dataframe into series
 fn flatten(df: &DataFrame, name: &str) -> Series {
     Series::new(
@@ -166,26 +148,14 @@ fn flatten(df: &DataFrame, name: &str) -> Series {
         df.iter()
             .flat_map(|s| {
                 s.clone()
-                    .bool()
+                    .i32()
                     .unwrap()
                     .into_iter()
-                    .collect::<Vec<Option<bool>>>()
+                    .collect::<Vec<Option<i32>>>()
             })
-            .map(|x| x.unwrap_or(false))
+            .map(|x| x.unwrap_or(-1))
             .collect::<Vec<_>>(),
     )
-}
-
-fn count_visible(df: &DataFrame) -> Result<usize, PolarsError> {
-    Ok(Forest::new(df)
-        .mask_trees()
-        .visibility_matrix()?
-        .lazy()
-        .select([fold_exprs(lit(0), |acc, x| Ok(acc + x), [all()])])
-        .filter(all().gt(lit(0)))
-        .collect()?
-        .shape()
-        .0)
 }
 
 fn main() {
@@ -195,11 +165,12 @@ fn main() {
     grid_to_csv(&grid_path, csv_path.to_str().unwrap());
     let file = File::open(&csv_path).unwrap();
     let df = CsvReader::new(file).has_header(false).finish().unwrap();
-    let n = count_visible(&df).unwrap();
+    let f = Forest::new(&df).count_trees().visibility_matrix().unwrap();
+    let scores = f.scenic_scores().unwrap();
     println!(
-        "The total number of visible trees of grid shape {:?} was {}",
+        "The highest scenic scores of grid size {:?} were {}",
         df.shape(),
-        n
+        scores.tail(Some(7))
     );
 }
 
@@ -218,9 +189,17 @@ mod test {
     }
 
     #[test]
+    fn test_scenic_scores() {
+        let df = get_df();
+        let f = Forest::new(&df).count_trees().visibility_matrix().unwrap();
+        let scores = f.scenic_scores().unwrap();
+        println!("{}", scores);
+    }
+
+    #[test]
     fn test_count_trees() {
         let df = get_df();
-        let f = Forest::new(&df).count_trees();
+        let f = Forest::new(&df).count_trees().visibility_matrix().unwrap();
         println!("{:?}", f);
     }
     #[test]
@@ -230,68 +209,6 @@ mod test {
             df.apply(name, num_visible).unwrap();
         }
         println!("{}", df);
-    }
-
-    #[test]
-    fn test_count_visible() {
-        let df = get_df();
-        let n = count_visible(&df).unwrap();
-        assert_eq!(n, 21);
-    }
-
-    #[test]
-    fn test_flatten() {
-        let mut df = get_df();
-        mask_visible(&mut df);
-        let flat = flatten(&df, "foo");
-        assert_eq!(flat.get(0).unwrap().to_string(), "true");
-    }
-    #[test]
-    fn test_is_vis_north() {
-        let mut df = get_df();
-        mask_visible(&mut df);
-        println!("{}", &df);
-        assert_eq!("false", df["column_1"].get(1).unwrap().to_string());
-        assert_eq!("true", df["column_1"].get(2).unwrap().to_string());
-    }
-
-    #[test]
-    fn test_is_vis_south() {
-        let mut df = get_df().reverse();
-        mask_visible(&mut df);
-        df = df.reverse();
-        println!("{}", &df);
-        assert_eq!("false", df["column_1"].get(0).unwrap().to_string());
-        assert_eq!("true", df["column_1"].get(2).unwrap().to_string());
-    }
-
-    #[test]
-    fn test_is_vis_west() {
-        let mut df = get_df().transpose().unwrap();
-        mask_visible(&mut df);
-        let res = df.transpose().unwrap();
-        println!("{}", &res);
-        assert_eq!("false", res["column_1"].get(0).unwrap().to_string());
-        assert_eq!("true", res["column_1"].get(1).unwrap().to_string());
-    }
-
-    #[test]
-    fn test_is_vis_east() {
-        let mut df = get_df().transpose().unwrap().reverse();
-        mask_visible(&mut df);
-        let res = df.reverse().transpose().unwrap();
-        println!("{}", &res);
-        assert_eq!("false", res["column_0"].get(0).unwrap().to_string());
-        assert_eq!("true", res["column_0"].get(2).unwrap().to_string());
-    }
-    #[test]
-    fn test_is_visible() {
-        let mut df = get_df();
-        for name in &get_cols(&df) {
-            df.apply(name, is_visible).unwrap();
-        }
-        println!("{:?}", &df);
-        assert_eq!(df.shape(), (5, 5));
     }
 
     #[test]
