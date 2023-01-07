@@ -73,6 +73,24 @@ impl Forest {
         self
     }
 
+    // Converts grid into count of tree visibility
+    fn count_trees(mut self) -> Self {
+        for df in [
+            &mut self.north,
+            &mut self.south,
+            &mut self.west,
+            &mut self.east,
+        ] {
+            for name in &get_cols(df) {
+                df.apply(name, num_visible).unwrap();
+            }
+        }
+        self.south = self.south.reverse();
+        self.west = self.west.transpose().unwrap();
+        self.east = self.east.reverse().transpose().unwrap();
+        self
+    }
+
     // Converts boolean grid into [TREE x DIRECTION] matrix
     fn visibility_matrix(self) -> Result<DataFrame, PolarsError> {
         Ok(DataFrame::new(
@@ -83,6 +101,9 @@ impl Forest {
                 .collect(),
         )?)
     }
+    fn highest_scenic_score(self) -> Self {
+        self
+    }
 }
 
 // Get owned column names from DataFrame
@@ -90,6 +111,29 @@ fn get_cols(df: &DataFrame) -> Vec<String> {
     df.get_column_names()
         .iter()
         .map(|x| x.to_string())
+        .collect()
+}
+
+// Count number of trees visible for each tree
+fn num_visible(s: &Series) -> Series {
+    let v = s
+        .iter()
+        .map(|x| x.try_extract::<i32>().expect("Could not parse i32"))
+        .collect::<Vec<i32>>();
+    s.iter()
+        .enumerate()
+        .map(|(i, x)| {
+            let mut n = 0;
+            for j in (0..i).rev() {
+                let val = x.try_extract::<i32>().expect("Couldn't parse i32");
+                if val > v[j] {
+                    n += 1;
+                } else {
+                    return n + 1;
+                }
+            }
+            n
+        })
         .collect()
 }
 
@@ -171,6 +215,21 @@ mod test {
         let csv_path = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("test.csv");
         let file = File::open(&csv_path).unwrap();
         CsvReader::new(file).has_header(false).finish().unwrap()
+    }
+
+    #[test]
+    fn test_count_trees() {
+        let df = get_df();
+        let f = Forest::new(&df).count_trees();
+        println!("{:?}", f);
+    }
+    #[test]
+    fn test_num_visible() {
+        let mut df = get_df();
+        for name in &get_cols(&df) {
+            df.apply(name, num_visible).unwrap();
+        }
+        println!("{}", df);
     }
 
     #[test]
